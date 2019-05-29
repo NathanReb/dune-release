@@ -123,8 +123,6 @@ val publish_artefacts : t -> ([`Distrib | `Doc | `Alt of string] list, R.msg) re
 
 (** {1 Uri} *)
 
-val doc_user_repo_and_path : t -> (string * string * Fpath.t, R.msg) result
-
 val distrib_user_and_repo : t -> (string * string, R.msg) result
 
 type f =

@@ -67,9 +67,12 @@ let lint_res ~msgf = function
 let pp_field = Fmt.(styled `Bold string)
 
 let lint_opam_doc pkg =
-  lint_res
-    ~msgf:(fun l -> l "opam field %a can be parsed by dune-release" pp_field "doc")
-    (Pkg.doc_user_repo_and_path pkg)
+  Pkg.opam_field_hd pkg "doc" >>| function
+  | None -> 0
+  | Some uri ->
+      lint_res
+        ~msgf:(fun l -> l "opam field %a can be parsed by dune-release" pp_field "doc")
+        (Github.Parse.github_doc_uri uri)
 
 let lint_opam_home_and_dev pkg =
   lint_res
@@ -83,8 +86,9 @@ let lint_opam_home_and_dev pkg =
     (Pkg.distrib_user_and_repo pkg)
 
 let lint_opam_github_fields pkg =
-  lint_opam_doc pkg
-  + lint_opam_home_and_dev pkg
+  lint_opam_doc pkg >>= fun doc_errs ->
+  let home_and_dev_errs = lint_opam_home_and_dev pkg in
+  Ok (doc_errs + home_and_dev_errs)
 
 let opam_lint_cmd ~opam_file_version ~opam_tool_version =
   let lint_older_format =
@@ -132,10 +136,10 @@ let opam_lint ~dry_run ~opam_file_version ~opam_tool_version opam_file =
     0
 
 let extra_opam_lint ~opam_file_version ~opam_file pkg =
+  lint_opam_github_fields pkg >>= fun github_field_errs ->
   let is_2_0_format = match opam_file_version with Some "2.0" -> true | _ -> false in
   let descr_err = if is_2_0_format then lint_descr ~opam_file pkg else 0 in
-  let github_field_errs = lint_opam_github_fields pkg in
-  descr_err + github_field_errs
+  Ok (descr_err + github_field_errs)
 
 let lint_opam ~dry_run pkg =
   let opam_tool_version = Lazy.force Opam.version in
@@ -149,7 +153,7 @@ let lint_opam ~dry_run pkg =
   | _ ->
       Pkg.opam pkg >>= fun opam_file ->
       let opam_lint_errors = opam_lint ~dry_run ~opam_file_version ~opam_tool_version opam_file in
-      let extra_errors = extra_opam_lint ~opam_file_version ~opam_file pkg in
+      extra_opam_lint ~opam_file_version ~opam_file pkg >>= fun extra_errors ->
       Ok (opam_lint_errors + extra_errors)
 
 let lint_opam ~dry_run pkg =

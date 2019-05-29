@@ -16,17 +16,22 @@ let gen_doc ~dry_run ~force dir pkg_names =
   Ok Fpath.(dir // doc_dir)
 
 let publish_doc ~dry_run ~yes pkg_names pkg =
-  Logs.app (fun l -> l "Publishing documentation");
-  Pkg.distrib_file ~dry_run pkg
-  >>= fun archive -> Pkg.publish_msg pkg
-  >>= fun msg -> Archive.untbz ~dry_run ~clean:true archive
-  >>= fun dir -> OS.Dir.exists dir
-  >>= fun force -> Pkg.infer_pkg_names dir pkg_names
-  >>= fun pkg_names ->
-  Logs.app (fun l -> l "Selected packages: %a" Fmt.(list (styled `Bold string)) pkg_names);
-  Logs.app (fun l -> l "Generating documentation from %a" Text.Pp.path archive);
-  gen_doc ~dry_run ~force dir pkg_names
-  >>= fun docdir -> Delegate.publish_doc ~dry_run ~yes pkg ~msg ~docdir
+  Pkg.opam_field_hd pkg "doc" >>= function
+  | None ->
+      Logs.app (fun l -> l "Skipping documentation publication as no doc field is defined");
+      Ok ()
+  | Some doc_uri ->
+      Logs.app (fun l -> l "Publishing documentation");
+      Pkg.distrib_file ~dry_run pkg
+      >>= fun archive -> Pkg.publish_msg pkg
+      >>= fun msg -> Archive.untbz ~dry_run ~clean:true archive
+      >>= fun dir -> OS.Dir.exists dir
+      >>= fun force -> Pkg.infer_pkg_names dir pkg_names
+      >>= fun pkg_names ->
+      Logs.app (fun l -> l "Selected packages: %a" Fmt.(list (styled `Bold string)) pkg_names);
+      Logs.app (fun l -> l "Generating documentation from %a" Text.Pp.path archive);
+      gen_doc ~dry_run ~force dir pkg_names
+      >>= fun docdir -> Delegate.publish_doc ~dry_run ~yes pkg ~msg ~docdir ~doc_uri
 
 let publish_distrib ~dry_run ~yes pkg =
   Logs.app (fun l -> l "Publishing distribution");

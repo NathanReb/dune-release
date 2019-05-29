@@ -37,21 +37,15 @@ let publish_distrib ~dry_run ~msg ~archive ~yes pkg =
         Cmd.(v "publish" % "distrib" % distrib_uri %
              name % version % msg % p archive)
 
-let publish_doc ~dry_run ~msg ~docdir ~yes p =
+let publish_doc ~dry_run ~msg ~docdir ~yes ~doc_uri p =
   Pkg.delegate p >>= function
   | None     ->
       Logs.app (fun l -> l "Publishing to github");
-      Github.publish_doc ~dry_run ~msg ~docdir ~yes p
+      Github.publish_doc ~dry_run ~msg ~docdir ~yes ~doc_uri p
   | Some del ->
       Logs.app (fun l -> l "Using delegate %a" Cmd.pp del);
-      let doc_uri p = Pkg.opam_field_hd p "doc" >>= function
-        | None -> Ok ""
-        | Some uri -> Ok uri
-      in
-      Pkg.name p
-      >>= fun name -> Pkg.version p
-      >>= fun version -> doc_uri p
-      >>= fun doc_uri ->
+      Pkg.name p >>= fun name ->
+      Pkg.version p >>= fun version ->
       run_delegate ~dry_run del
         Cmd.(v "publish" % "doc" % doc_uri % name % version % msg %
              p docdir)

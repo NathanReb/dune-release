@@ -322,33 +322,6 @@ let distrib_user_and_repo p =
           end
           |> R.reword_error_msg (fun _ -> uri_error uri)
 
-let doc_uri p = opam_field_hd p "doc" >>| function
-  | None     -> ""
-  | Some uri -> uri
-
-let doc_user_repo_and_path p =
-  doc_uri p >>= fun uri ->
-  (* Parses the $PATH of $SCHEME://$HOST/$REPO/$PATH *)
-  let uri_error uri =
-    R.msgf "Could not derive publication directory $PATH from opam doc \
-            field value %a; expected the pattern \
-            $SCHEME://$USER.github.io/$REPO/$PATH" String.dump uri
-  in
-  match Text.split_uri ~rel:true uri with
-  | None -> Error (uri_error uri)
-  | Some (_, host, path) ->
-      if path = "" then Error (uri_error uri) else
-      (match String.cut ~sep:"." host with
-      | Some (user, g) when String.equal g "github.io" -> Ok user
-      | _ -> Error (uri_error uri))
-      >>= fun user ->
-      match String.cut ~sep:"/" path with
-      | None -> Ok (user, path, Fpath.v ".")
-      | Some (repo, "") -> Ok (user, repo, Fpath.v ".")
-      | Some (repo, path) ->
-          (Fpath.of_string path >>| fun p -> user, repo, Fpath.rem_empty_seg p)
-          |> R.reword_error_msg (fun _ -> uri_error uri)
-
 let publish_msg p = match p.publish_msg with
 | Some msg -> Ok msg
 | None ->

@@ -18,6 +18,11 @@ module Parse : sig
   val archive_upload_url : string -> (string, R.msg) Result.result
   (** [archive_upload_url response] extracts the browser_download_url field from a github
       release asset upload response. *)
+
+  val github_doc_uri : string -> ((string * string * Fpath.t), R.msg) result
+  (** [github_doc_uri uri] parses the github.io doc [uri] and return the user and repo and path
+      it refers to. Expects a $SCHEME://$USER.github.io/$REPO/$PATH URL.
+      Returns an error otherwise. *)
 end
 
 (** {1 Publish} *)
@@ -30,8 +35,11 @@ val publish_distrib :
   Pkg.t -> (string, R.msg) Result.result
 
 val publish_doc :
-  dry_run: bool -> msg:string -> docdir:Fpath.t ->
+  dry_run: bool ->
+  msg:string ->
+  docdir:Fpath.t ->
   yes: bool ->
+  doc_uri: string ->
   Pkg.t -> (unit, R.msg) Result.result
 
 val publish_in_git_branch :

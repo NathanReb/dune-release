@@ -39,6 +39,27 @@ module Parse = struct
     match exec_opt compiled response with
     | Some groups when Group.test groups 1 -> Ok (Group.get groups 1)
     | Some _ | None -> error ()
+
+  let github_doc_uri uri =
+    let uri_error uri =
+      R.msgf "Could not derive publication directory $PATH from opam doc \
+              field value %a; expected the pattern \
+              $SCHEME://$USER.github.io/$REPO/$PATH" String.dump uri
+    in
+    match Text.split_uri ~rel:true uri with
+    | None -> Error (uri_error uri)
+    | Some (_, host, path) ->
+        if path = "" then Error (uri_error uri) else
+        (match String.cut ~sep:"." host with
+        | Some (user, g) when String.equal g "github.io" -> Ok user
+        | _ -> Error (uri_error uri))
+        >>= fun user ->
+        match String.cut ~sep:"/" path with
+        | None -> Ok (user, path, Fpath.v ".")
+        | Some (repo, "") -> Ok (user, repo, Fpath.v ".")
+        | Some (repo, path) ->
+            (Fpath.of_string path >>| fun p -> user, repo, Fpath.rem_empty_seg p)
+            |> R.reword_error_msg (fun _ -> uri_error uri)
 end
 
 (* Publish documentation *)
@@ -108,8 +129,8 @@ let publish_in_git_branch ~dry_run ~remote ~branch ~name ~version ~docdir ~dir ~
       log_publish_result "Published documentation for" (name, version) dir;
       Ok ()
 
-let publish_doc ~dry_run ~msg:_ ~docdir ~yes p =
-  (if dry_run then Ok D.(user, repo, dir) else Pkg.doc_user_repo_and_path p)
+let publish_doc ~dry_run ~msg:_ ~docdir ~yes ~doc_uri p =
+  (if dry_run then Ok D.(user, repo, dir) else Parse.github_doc_uri doc_uri)
   >>= fun (user, repo, dir) -> Pkg.name p
   >>= fun name -> Pkg.version p
   >>= fun version ->
